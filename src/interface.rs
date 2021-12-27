@@ -1,4 +1,3 @@
-use std::ops::Add;
 use bevy::prelude::*;
 use crate::common::Health;
 use crate::player::Player;
@@ -41,7 +40,7 @@ fn interface_setup_sys(mut cmd: Commands, asset_server: Res<AssetServer>) {
 
 fn score_update_sys(mut score_text: Query<&mut Text, With<ScoreText>>, player: Query<(&Player, &Health), Or<(Changed<Health>, Changed<Player>)>>) {
     for mut text in score_text.iter_mut() {
-        let mut new_text = String::from("");
+        //let mut new_text = String::from("");
         for (player, health) in player.iter() {
             //new_text.push_str(&format!("Health: {}\n Score: {}", health.health, player.score));
             text.sections[0].value = format!("Health: {}\n Score: {}", health.health, player.score);

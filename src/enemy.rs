@@ -1,11 +1,7 @@
 use bevy::prelude::*;
-use crate::common::{
-    *,
-    Direction,
-};
-use crate::projectile::*;
 use rand::prelude::*;
-use crate::projectile::ProjectilePlugin;
+use crate::common::{Direction, *};
+use crate::projectile::*;
 
 const WINDOW_MARGIN: f32             = 100.;
 const DEFAULT_MOVE_SPEED: f32        = 150.;
@@ -32,6 +28,7 @@ pub struct EnemyBundle {
     pub enemy: Enemy,
     pub health: Health,
     pub shooter: Shooter,
+    pub collision_box: CollisionBox,
 
     #[bundle]
     pub sprite: SpriteBundle,
@@ -43,7 +40,8 @@ impl Default for EnemyBundle {
             enemy: Default::default(),
             health: Default::default(),
             shooter: Default::default(),
-            sprite: Default::default()
+            sprite: Default::default(),
+            collision_box: CollisionBox{ size: Vec2::new(15., 15.)}
         }
     }
 }
@@ -64,7 +62,7 @@ pub fn enemy_move_sys(mut enemy_transforms: Query<(&mut Enemy, &mut Transform), 
                 match &enemy.move_direction {
                     Direction::LEFT  => { transform.translation.x = transform.translation.x - enemy.move_speed * time.delta_seconds() }
                     Direction::RIGHT => { transform.translation.x = transform.translation.x + enemy.move_speed * time.delta_seconds() }
-                    other=> {}
+                    _ => {}
                 }
             }
         }
@@ -74,7 +72,7 @@ pub fn enemy_move_sys(mut enemy_transforms: Query<(&mut Enemy, &mut Transform), 
 
 /// Enemies shoot straight down by random choice and interval
 pub fn enemy_shoot_sys(mut cmd: Commands, mut enemy_shooter: Query<(Entity, &mut Shooter, &Transform), With<Enemy>>) {
-    for (entity, mut shooter, transform) in enemy_shooter.iter_mut() {
+    for (entity, shooter, transform) in enemy_shooter.iter_mut() {
         if shooter.fire_rate > rand::random::<f32>() {
             cmd.spawn_bundle(ProjectileBundle {
                 projectile: Projectile {
@@ -98,8 +96,9 @@ pub fn enemy_shoot_sys(mut cmd: Commands, mut enemy_shooter: Query<(Entity, &mut
     }
 }
 
+
 /// Creates [`Enemy`] entities at random positions on top half of screen.
-pub fn enemy_startup_sys(mut cmd: Commands, state: Res<EnemyPluginState>, windows: Res<Windows>) {
+pub fn enemy_startup_sys(mut cmd: Commands, state: Res<EnemyPlugin>, windows: Res<Windows>) {
     let width = windows.get_primary().unwrap().width() / 2.0;
     let height = windows.get_primary().unwrap().height() / 2.0;
     let mut vertical_pos = height - ENEMY_VERT_SPACING;
@@ -118,6 +117,7 @@ pub fn enemy_startup_sys(mut cmd: Commands, state: Res<EnemyPluginState>, window
                 transform: Transform::from_xyz(horizontal_pos, vertical_pos, 0.0),
                 ..Default::default()
             },
+            shooter: Shooter { ammo_count: 10, fire_rate: state.fire_rate },
             ..Default::default()
         });
         vertical_pos -= ENEMY_VERT_SPACING;
@@ -126,22 +126,21 @@ pub fn enemy_startup_sys(mut cmd: Commands, state: Res<EnemyPluginState>, window
 
 pub struct EnemyPlugin {
     pub enemy_count: i32,
-}
-
-pub struct EnemyPluginState {
-    enemy_count: i32,
+    pub fire_rate: f32,
 }
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
 
-        let state = EnemyPluginState {
-            enemy_count: self.enemy_count
+        let x = Self {
+            enemy_count: self.enemy_count,
+            fire_rate: self.fire_rate,
         };
 
-        app .insert_resource(state)
+        app .insert_resource(x)
             .add_startup_system(enemy_startup_sys)
             .add_system(enemy_move_sys)
             .add_system(enemy_shoot_sys);
+            //.add_system(enemy_hit_sys);
     }
 }

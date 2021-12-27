@@ -1,11 +1,7 @@
-use bevy::app::Events;
-use bevy::ecs::query::QueryEntityError;
-use bevy::ecs::system::QueryComponentError;
 use bevy::prelude::*;
-use bevy::utils::tracing::Event;
 use crate::common::{Health, Shooter, Direction};
-use crate::{CollisionBox, Enemy};
-use crate::projectile::{Projectile, ProjectileBundle, ProjectileHitEvent};
+use crate::{CollisionBox, CollisionEvent, Enemy};
+use crate::projectile::{Projectile, ProjectileBundle};
 
 const MOVE_SPEED: f32 = 600.;
 const PLAYER_VERT_OFFSET: f32 = 200.;
@@ -74,8 +70,8 @@ fn player_move_sys(mut player_transforms: Query<&mut Transform, With<Player>>, k
     }
 }
 
-fn player_shoot_sys(mut player_shooter: Query<(Entity, &Player, &Transform, &mut Shooter)>, keyboard_input: Res<Input<KeyCode>>, mut cmd: Commands) {
-    for (entity, player, transform, mut shooter) in player_shooter.iter_mut() {
+fn player_shoot_sys(mut player_shooter: Query<(Entity, &Transform)>, keyboard_input: Res<Input<KeyCode>>, mut cmd: Commands) {
+    for (entity, transform) in player_shooter.iter_mut() {
         if keyboard_input.just_pressed(KeyCode::Space) {
             info!("Player entity={} shooting", &entity.id());
             cmd.spawn_bundle(ProjectileBundle {
@@ -101,16 +97,35 @@ fn player_shoot_sys(mut player_shooter: Query<(Entity, &Player, &Transform, &mut
     }
 }
 
-fn player_score_sys(mut hit_events: EventReader<ProjectileHitEvent>, enemies: Query<&Enemy>, projectiles: Query<&Projectile>, mut players: Query<&mut Player>) {
-    for &ProjectileHitEvent{projectile, other} in hit_events.iter() {
-        match enemies.get_component::<Enemy>(other) { // hits an enemy
+fn player_score_sys(mut hit_events: EventReader<CollisionEvent>, enemies: Query<&Enemy>, projectiles: Query<&Projectile>, mut players: Query<&mut Player>) {
+    for &CollisionEvent{a, b, .. } in hit_events.iter() {
+        match enemies.get_component::<Enemy>(b) { // hits an enemy
             Ok(_) => {
-                match projectiles.get_component::<Projectile>(projectile) { // hit by projectile
+                match projectiles.get_component::<Projectile>(a) { // hit by projectile
                     Ok(projectile) => {
-                        match players.get_mut(projectile.origin.unwrap()) { // projectile origin entity
+                        match players.get_mut(projectile.origin.unwrap()) { // projectiles origin entity
                             Ok(mut player) => { player.score = player.score + 10 }
                             Err(_) => { warn!("Could not apply player score: No player as origin for projectile")}
                         }
+                    }
+                    Err(_) => {}
+                }
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+fn player_hit_sys(
+    mut hit_events: EventReader<CollisionEvent>,
+    mut player_healths: Query<&mut Health, With<Player>>,
+    projectiles: Query<&Projectile>) {
+    for &CollisionEvent{a, b, ..} in hit_events.iter(){
+        match player_healths.get_mut(b) { // Check is player w/ health
+            Ok(mut player_health) => {
+                match projectiles.get(a) {
+                    Ok(projectile) => {
+                        player_health.health = player_health.health - projectile.damage;
                     }
                     Err(_) => {}
                 }
@@ -131,6 +146,7 @@ impl Plugin for PlayerPlugin {
         app .add_startup_system(player_startup_sys)
             .add_system(player_move_sys)
             .add_system(player_shoot_sys)
-            .add_system(player_score_sys);
+            .add_system(player_score_sys)
+            .add_system(player_hit_sys);
     }
 }

@@ -79,12 +79,12 @@ pub struct CollisionEvent {
     pub collision: Collision,
 }
 
-fn collision_sys(mut colliders: Query<(Entity, &Transform, &CollisionBox)>, mut hit_event_writer: EventWriter<CollisionEvent>) {
+fn collision_sys(colliders: Query<(Entity, &Transform, &CollisionBox)>, mut hit_event_writer: EventWriter<CollisionEvent>) {
     let mut hits: HashMap<Entity, Vec<Entity>> = HashMap::default(); // Tracks which entities have already collided to avoid duplicate/ghost collisions
     for (entity, transform, shape) in colliders.iter() {
         for (hit_entity, hit_transform, hit_shape) in colliders.iter(){
-            let mut collisions = hits.entry(hit_entity).or_insert(Vec::new()); // Entities which `hit_entity` has already collided with this frame
-            if entity == hit_entity || collisions.contains(&entity) { continue };
+            let collisions = hits.entry(hit_entity).or_insert(Vec::new()); // Entities which `hit_entity` has already collided with this frame
+            if entity == hit_entity /*|| collisions.contains(&entity)*/ { continue };
 
             match collide(transform.translation, shape.size, hit_transform.translation, hit_shape.size) {
                 Some(collision) => {
@@ -109,10 +109,9 @@ fn collision_debug_sys(mut collision_events: EventReader<CollisionEvent>) {
             Collision::Top => {"Top"}
             Collision::Bottom => {"Bottom"}
         };
-        info!("Collision between {} -> {}. Side: {}", a.id(), b.id(), side);
+        debug!("Collision between {} -> {}. Side: {}", a.id(), b.id(), side);
     }
 }
-
 
 pub struct GameCommonPlugin;
 
@@ -120,7 +119,9 @@ impl Plugin for GameCommonPlugin {
     fn build(&self, app: &mut App) {
         app .add_system(health_event_sys)
             .add_system(collision_sys)
-            .add_system(collision_debug_sys)
             .add_event::<CollisionEvent>();
+
+        #[cfg(debug_assertions)]
+        app.add_system(collision_debug_sys);
     }
 }

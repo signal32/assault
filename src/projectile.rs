@@ -1,6 +1,4 @@
 use bevy::prelude::*;
-use bevy::sprite::collide_aabb::{collide, Collision};
-use bevy::utils::HashMap;
 use crate::common::{Direction, *};
 
 #[derive(Component)]
@@ -32,7 +30,7 @@ pub struct ProjectileBundle {
 }
 
 fn projectile_move_sys(mut projectile_transforms: Query<(&mut Projectile, &mut Transform)>) {
-    for (mut projectile, mut transforms) in projectile_transforms.iter_mut() {
+    for ( projectile, mut transforms) in projectile_transforms.iter_mut() {
         match &projectile.direction {
             Direction::UP    => { transforms.translation.y = transforms.translation.y + 10.0 }
             Direction::DOWN  => { transforms.translation.y = transforms.translation.y - 10.0 }
@@ -66,9 +64,9 @@ pub struct ProjectileHitEvent {
     pub other: Entity,
 }
 
-fn projectile_hit_sys(
+fn projectile_hit_sys_old(
     mut cmd: Commands,
-    mut projectiles: Query<(Entity, &Projectile, &Transform)>,
+    projectiles: Query<(Entity, &Projectile, &Transform)>,
     mut health_transforms: Query<(Entity, &mut Health, &Transform)>,
     mut hit_event_writer: EventWriter<ProjectileHitEvent>) {
     for (entity, projectile, transform) in projectiles.iter() {
@@ -86,6 +84,19 @@ fn projectile_hit_sys(
                 info!("Removing projectile entity {}: hit entity {} (health: {}, damage_dealt: {})", &entity.id(), &hit_entity.id(), hit_health.health, projectile.damage );
                 cmd.entity(entity).despawn();
             }
+        }
+    }
+}
+
+fn projectile_hit_sys(mut cmd: Commands, mut hit_events: EventReader<CollisionEvent>, projectiles: Query<&Projectile>) {
+    for &CollisionEvent{a, b, ..} in hit_events.iter() {
+        match projectiles.get(a) { // Test if projectile
+            Ok(projectile) => {
+                if projectile.origin.unwrap() != b {
+                    cmd.entity(a).despawn();
+                }
+            }
+            Err(_) => {}
         }
     }
 }
@@ -120,7 +131,8 @@ impl Plugin for ProjectilePlugin {
     fn build(&self, app: &mut App) {
         app .add_system(projectile_move_sys)
             .add_system(projectile_remove_sys)
-            .add_system(projectile_hit_sys)
-            .add_event::<ProjectileHitEvent>();
+            .add_system(projectile_hit_sys);
+            //.add_system(projectile_hit_sys)
+            //.add_event::<ProjectileHitEvent>();
     }
 }
