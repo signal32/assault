@@ -70,7 +70,7 @@ fn player_move_sys(mut player_transforms: Query<&mut Transform, With<Player>>, k
     }
 }
 
-fn player_shoot_sys(mut player_shooter: Query<(Entity, &Transform)>, keyboard_input: Res<Input<KeyCode>>, mut cmd: Commands) {
+fn player_shoot_sys(mut player_shooter: Query<(Entity, &Transform), With<Player>>, keyboard_input: Res<Input<KeyCode>>, mut cmd: Commands) {
     for (entity, transform) in player_shooter.iter_mut() {
         if keyboard_input.just_pressed(KeyCode::Space) {
             info!("Player entity={} shooting", &entity.id());
