@@ -1,7 +1,9 @@
+use bevy::ecs::query::QueryEntityError;
 use bevy::prelude::*;
 use rand::prelude::*;
 use crate::common::{Direction, *};
 use crate::projectile::*;
+use crate::player::*;
 
 const WINDOW_MARGIN: f32             = 100.;
 const DEFAULT_MOVE_SPEED: f32        = 150.;
@@ -72,6 +74,7 @@ pub fn enemy_move_sys(mut enemy_transforms: Query<(&mut Enemy, &mut Transform), 
 
 /// Enemies shoot straight down by random choice and interval
 pub fn enemy_shoot_sys(mut cmd: Commands, mut enemy_shooter: Query<(Entity, &mut Shooter, &Transform), With<Enemy>>) {
+    let other_enemies: Vec<Entity> = enemy_shooter.iter().map(|(e, _, _)| { e}).collect();
     for (entity, shooter, transform) in enemy_shooter.iter_mut() {
         if shooter.fire_rate > rand::random::<f32>() {
             cmd.spawn_bundle(ProjectileBundle {
@@ -79,7 +82,8 @@ pub fn enemy_shoot_sys(mut cmd: Commands, mut enemy_shooter: Query<(Entity, &mut
                     direction: Direction::DOWN,
                     damage: DEFAULT_PROJECTILE_DAMAGE,
                     speed_multiplier: Default::default(),
-                    origin: Some(entity.clone())
+                    origin: Some(entity.clone()),
+                    whitelist: other_enemies.clone(),
                 },
                 sprite: SpriteBundle {
                     sprite: Sprite {
@@ -92,6 +96,42 @@ pub fn enemy_shoot_sys(mut cmd: Commands, mut enemy_shooter: Query<(Entity, &mut
                 },
                 ..Default::default()
             });
+        }
+    }
+}
+
+/// Reduces enemy health and increases player score when hit
+fn enemy_hit_sys(
+    mut hit_events: EventReader<CollisionEvent>,
+    mut players: Query<&mut Player>,
+    mut enemy_healths: Query<&mut Health, With<Enemy>>,
+    projectiles: Query<&Projectile>) {
+    for &CollisionEvent{a, b, ..} in hit_events.iter() {
+        match enemy_healths.get_mut(b) {
+            Ok(mut enemy_health) => {
+                match projectiles.get(a) {
+                    Ok(projectile) => {
+                        match players.get_mut(projectile.origin.unwrap()){
+                            Ok(mut player) => {
+                                player.score += 10;//todo calculate enemy destroy score from enemy stats
+                                enemy_health.health = enemy_health.health - projectile.damage;
+                            }
+                            Err(_) => {/*warn!("Enemy just shot itself.")*/}
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+pub fn enemy_remove_sys(mut cmd: Commands, enemies: Query<(Entity, &Health), With<Enemy>>) {
+    for (entity, health) in enemies.iter() {
+        if health.health <= 0 {
+            info!("Removing enemy Entity {}: Health is {}", entity.id(), health.health);
+            cmd.entity(entity).despawn();
         }
     }
 }
@@ -140,7 +180,8 @@ impl Plugin for EnemyPlugin {
         app .insert_resource(x)
             .add_startup_system(enemy_startup_sys)
             .add_system(enemy_move_sys)
-            .add_system(enemy_shoot_sys);
-            //.add_system(enemy_hit_sys);
+            .add_system(enemy_shoot_sys)
+            .add_system(enemy_remove_sys)
+            .add_system(enemy_hit_sys);
     }
 }

@@ -79,7 +79,8 @@ fn player_shoot_sys(mut player_shooter: Query<(Entity, &Transform), With<Player>
                     direction: Direction::UP,
                     damage: 30,
                     speed_multiplier: Default::default(),
-                    origin: Some(entity.clone())
+                    origin: Some(entity.clone()),
+                    whitelist: Vec::new(),
                 },
                 sprite: SpriteBundle {
                     sprite: Sprite {
@@ -116,6 +117,7 @@ fn player_score_sys(mut hit_events: EventReader<CollisionEvent>, enemies: Query<
     }
 }
 
+/// Reduces players health when hit by [`Projectile`].
 fn player_hit_sys(
     mut hit_events: EventReader<CollisionEvent>,
     mut player_healths: Query<&mut Health, With<Player>>,
@@ -136,6 +138,10 @@ fn player_hit_sys(
 }
 
 fn player_startup_sys(mut cmd: Commands) {
+    new_player(&mut cmd);
+}
+
+pub fn new_player(cmd: &mut Commands) {
     cmd.spawn_bundle(PlayerBundle::default());
 }
 
@@ -146,7 +152,7 @@ impl Plugin for PlayerPlugin {
         app .add_startup_system(player_startup_sys)
             .add_system(player_move_sys)
             .add_system(player_shoot_sys)
-            .add_system(player_score_sys)
+            //.add_system(player_score_sys)
             .add_system(player_hit_sys);
     }
 }

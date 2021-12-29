@@ -7,6 +7,7 @@ pub struct Projectile {
     pub damage: i32,
     pub speed_multiplier: f32,
     pub origin: Option<Entity>,
+    pub whitelist: Vec<Entity>,//todo
 }
 
 impl Default for Projectile {
@@ -16,6 +17,7 @@ impl Default for Projectile {
             damage: 10,
             speed_multiplier: 1.0,
             origin: Option::None,
+            whitelist: Vec::default(),
         }
     }
 }
@@ -41,6 +43,7 @@ fn projectile_move_sys(mut projectile_transforms: Query<(&mut Projectile, &mut T
 
 }
 
+/// Removes projectiles that move beyond bounds of game area
 fn projectile_remove_sys(mut cmd: Commands, mut projectile_entities: Query<(Entity, &Transform), With<Projectile>>, windows: Res<Windows>){
     let bounds_top =  windows.get_primary().unwrap().height();
     let bounds_right =  windows.get_primary().unwrap().width();
@@ -92,7 +95,7 @@ fn projectile_hit_sys(mut cmd: Commands, mut hit_events: EventReader<CollisionEv
     for &CollisionEvent{a, b, ..} in hit_events.iter() {
         match projectiles.get(a) { // Test if projectile
             Ok(projectile) => {
-                if projectile.origin.unwrap() != b {
+                if projectile.origin.unwrap() != b && !projectile.whitelist.contains(&b) {
                     cmd.entity(a).despawn();
                 }
             }

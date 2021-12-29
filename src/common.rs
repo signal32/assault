@@ -117,8 +117,7 @@ pub struct GameCommonPlugin;
 
 impl Plugin for GameCommonPlugin {
     fn build(&self, app: &mut App) {
-        app .add_system(health_event_sys)
-            .add_system(collision_sys)
+        app .add_system(collision_sys)
             .add_event::<CollisionEvent>();
 
         #[cfg(debug_assertions)]
